@@ -17,4 +17,18 @@ class Settings(BaseSettings):
     )
 
 
+def _normalize_sqlalchemy_url(url: str) -> str:
+    # If user provides a plain Postgres URL, pick a sane default driver.
+    #
+    # Supabase pooler (PgBouncer) + psycopg3 can intermittently hit `_pg3_*`
+    # prepared-statement errors. For pooler URLs, prefer psycopg2.
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        rest = url.split("://", 1)[1]
+        if "pooler.supabase.com" in url:
+            return "postgresql+psycopg2://" + rest
+        return "postgresql+psycopg://" + rest
+    return url
+
+
 settings = Settings()
+settings.database_url = _normalize_sqlalchemy_url(settings.database_url)
