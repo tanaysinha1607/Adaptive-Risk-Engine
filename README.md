@@ -23,4 +23,3 @@ uvicorn backend.main:app --reload
 ```
 
 API will be at `http://127.0.0.1:8000` and docs at `http://127.0.0.1:8000/docs`.
-
