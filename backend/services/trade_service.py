@@ -12,12 +12,6 @@ from backend.services.risk_engine import compute_current_risk
 from backend.services.stream_manager import stream_manager
 
 
-class TradeBlockedError(Exception):
-    def __init__(self, risk_score: float) -> None:
-        super().__init__("Trade blocked due to high risk")
-        self.risk_score = risk_score
-
-
 async def create_trade(db: Session, payload: TradeCreate) -> Trade:
     ts = payload.timestamp
     if ts is None:
@@ -30,8 +24,12 @@ async def create_trade(db: Session, payload: TradeCreate) -> Trade:
 
     leverage = float(payload.leverage)
     action_details: dict | None = None
+    blocked = False
 
     if decision.action == "block_trades":
+        # Simulate trade blocking as a policy decision, but still persist/broadcast
+        # the trade so the live dashboard continues to update in high-risk regimes.
+        blocked = True
         db.add(
             RiskLog(
                 risk_score=float(risk.risk_score),
@@ -45,7 +43,6 @@ async def create_trade(db: Session, payload: TradeCreate) -> Trade:
             "action",
             {"action": "block_trades", "risk_score": float(risk.risk_score), "details": decision.details},
         )
-        raise TradeBlockedError(risk_score=float(risk.risk_score))
 
     if decision.action == "reduce_leverage":
         new_leverage = max(1.0, min(leverage, 20.0))
@@ -97,6 +94,7 @@ async def create_trade(db: Session, payload: TradeCreate) -> Trade:
             "amount": trade.amount,
             "leverage": trade.leverage,
             "timestamp": trade.timestamp.isoformat(),
+            "blocked": blocked,
         },
     )
     return trade
